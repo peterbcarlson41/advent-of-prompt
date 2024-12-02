@@ -17,10 +17,10 @@ Each day's solution is organized in its own directory:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/advent-of-prompt.git
+git clone https://github.com/peterbcarlson41/advent-of-prompt.git
 ```
 
-2. Navigate to a specific day:
+2. Navigate to a specific day:s
 
 ```bash
 cd day-01
