@@ -1,11 +1,26 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { debounce } from "lodash";
 
-interface ThreeCountdownProps {}
+// Exportable interfaces
+export interface CountdownSettings {
+  minutes: number;
+  seconds: number;
+  color: string;
+  textSettings: TextSettings;
+}
+
+export interface TextSettings {
+  size: number;
+  height: number;
+  bevelSize: number;
+  bevelThickness: number;
+  curveSegments: number;
+}
 
 interface Particle {
   position: THREE.Vector3;
@@ -14,12 +29,23 @@ interface Particle {
   mesh: THREE.Mesh;
 }
 
-interface TextSettings {
-  size: number;
-  height: number;
-  bevelSize: number;
-  bevelThickness: number;
-  curveSegments: number;
+// Default settings that can be imported
+export const defaultCountdownSettings: CountdownSettings = {
+  minutes: 0,
+  seconds: 0,
+  color: "#00ff00",
+  textSettings: {
+    size: 3,
+    height: 1,
+    bevelSize: 0.1,
+    bevelThickness: 0.1,
+    curveSegments: 12,
+  },
+};
+
+interface ThreeCountdownProps {
+  initialSettings?: CountdownSettings;
+  onSettingsChange?: (settings: CountdownSettings) => void;
 }
 
 const styles = {
@@ -86,7 +112,10 @@ const styles = {
   },
 };
 
-export default function ThreeCountdown({}: ThreeCountdownProps) {
+export default function ThreeCountdown({
+  initialSettings = defaultCountdownSettings,
+  onSettingsChange,
+}: ThreeCountdownProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene>();
   const cameraRef = useRef<THREE.PerspectiveCamera>();
@@ -94,17 +123,14 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
   const textGroupRef = useRef<THREE.Group>();
   const controlsRef = useRef<OrbitControls>();
   const requestRef = useRef<number>();
-  const [minutes, setMinutes] = useState<number>(0);
-  const [seconds, setSeconds] = useState<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [minutes, setMinutes] = useState<number>(initialSettings.minutes);
+  const [seconds, setSeconds] = useState<number>(initialSettings.seconds);
   const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [color, setColor] = useState<string>("#00ff00");
-  const [textSettings, setTextSettings] = useState<TextSettings>({
-    size: 3,
-    height: 1,
-    bevelSize: 0.1,
-    bevelThickness: 0.1,
-    curveSegments: 12,
-  });
+  const [color, setColor] = useState<string>(initialSettings.color);
+  const [textSettings, setTextSettings] = useState<TextSettings>(
+    initialSettings.textSettings
+  );
   const timeRef = useRef<{ minutes: number; seconds: number }>({
     minutes: 0,
     seconds: 0,
@@ -114,6 +140,87 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
   const explosionTimeRef = useRef<number>(0);
   const isExplodingRef = useRef<boolean>(false);
   const fontRef = useRef<any>(null);
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const settings: CountdownSettings = JSON.parse(
+          e.target?.result as string
+        );
+        if (
+          "minutes" in settings &&
+          "seconds" in settings &&
+          "color" in settings &&
+          "textSettings" in settings
+        ) {
+          setMinutes(settings.minutes);
+          setSeconds(settings.seconds);
+          setColor(settings.color);
+          setTextSettings(settings.textSettings);
+        } else {
+          alert("Invalid settings file format");
+        }
+      } catch (error) {
+        alert("Error reading settings file");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+
+  useEffect(() => {
+    if (onSettingsChange) {
+      const currentSettings: CountdownSettings = {
+        minutes,
+        seconds,
+        color,
+        textSettings,
+      };
+      onSettingsChange(currentSettings);
+    }
+  }, [minutes, seconds, color, textSettings, onSettingsChange]);
+
+  const debouncedCreateTimeText = useCallback(
+    debounce((timeString: string, clear: boolean = true) => {
+      if (!fontRef.current) return;
+
+      if (clear && textGroupRef.current) {
+        textGroupRef.current.clear();
+      }
+
+      const geometry = new TextGeometry(timeString, {
+        font: fontRef.current,
+        size: textSettings.size,
+        height: textSettings.height,
+        curveSegments: textSettings.curveSegments,
+        bevelEnabled: true,
+        bevelThickness: textSettings.bevelThickness,
+        bevelSize: textSettings.bevelSize,
+        bevelOffset: 0,
+        bevelSegments: 5,
+      });
+
+      const material = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(color),
+        specular: 0x555555,
+        shininess: 30,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+
+      geometry.computeBoundingBox();
+      const textWidth =
+        geometry.boundingBox!.max.x - geometry.boundingBox!.min.x;
+      mesh.position.x = -textWidth / 2;
+
+      textGroupRef.current?.add(mesh);
+    }, 100),
+    [textSettings, color]
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -163,8 +270,7 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
     const fontLoader = new FontLoader();
     fontLoader.load("/fonts/helvetiker_regular.typeface.json", (font) => {
       fontRef.current = font;
-      // Show initial preview when font loads
-      createTimeText(formatTime(minutes, seconds));
+      debouncedCreateTimeText(formatTime(minutes, seconds));
     });
 
     // Animation loop
@@ -216,7 +322,6 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
 
     window.addEventListener("resize", handleResize);
 
-    // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
       if (requestRef.current) {
@@ -231,12 +336,18 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
     };
   }, []);
 
-  // Update preview when settings change
   useEffect(() => {
     if (fontRef.current && !isRunning) {
-      createTimeText(formatTime(minutes, seconds));
+      debouncedCreateTimeText(formatTime(minutes, seconds));
     }
-  }, [minutes, seconds, color, textSettings]);
+  }, [
+    minutes,
+    seconds,
+    color,
+    textSettings,
+    debouncedCreateTimeText,
+    isRunning,
+  ]);
 
   const formatTime = (minutes: number, seconds: number): string => {
     return `${minutes.toString().padStart(2, "0")}:${seconds
@@ -246,7 +357,6 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
 
   const createParticlesFromMesh = (mesh: THREE.Mesh) => {
     const geometry = mesh.geometry;
-    const positionAttribute = geometry.getAttribute("position");
     const particles: Particle[] = [];
     const particleCount = 1000;
 
@@ -313,45 +423,11 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
     explosionTimeRef.current = performance.now();
   };
 
-  const createTimeText = (timeString: string, clear: boolean = true) => {
-    if (!fontRef.current) return;
-
-    if (clear && textGroupRef.current) {
-      textGroupRef.current.clear();
-    }
-
-    const geometry = new TextGeometry(timeString, {
-      font: fontRef.current,
-      size: textSettings.size,
-      height: textSettings.height,
-      curveSegments: textSettings.curveSegments,
-      bevelEnabled: true,
-      bevelThickness: textSettings.bevelThickness,
-      bevelSize: textSettings.bevelSize,
-      bevelOffset: 0,
-      bevelSegments: 5,
-    });
-
-    const material = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(color),
-      specular: 0x555555,
-      shininess: 30,
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
-
-    geometry.computeBoundingBox();
-    const textWidth = geometry.boundingBox!.max.x - geometry.boundingBox!.min.x;
-    mesh.position.x = -textWidth / 2;
-
-    textGroupRef.current?.add(mesh);
-  };
-
   const stopCountdown = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       setIsRunning(false);
-      createTimeText(formatTime(minutes, seconds));
+      debouncedCreateTimeText(formatTime(minutes, seconds));
     }
   };
 
@@ -371,6 +447,10 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
         if (timeRef.current.minutes === 0) {
           clearInterval(intervalRef.current);
           setIsRunning(false);
+          explodeText;
+
+          clearInterval(intervalRef.current);
+          setIsRunning(false);
           explodeText();
           return;
         }
@@ -380,7 +460,7 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
         timeRef.current.seconds--;
       }
 
-      createTimeText(
+      debouncedCreateTimeText(
         formatTime(timeRef.current.minutes, timeRef.current.seconds)
       );
     }, 1000);
@@ -402,25 +482,43 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
     max: number;
     step: number;
     disabled: boolean;
-  }) => (
-    <div style={styles.inputContainer}>
-      <label style={styles.label}>
-        {label}: {value}
-      </label>
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          style={{ flex: 1 }}
-          disabled={disabled}
-        />
+  }) => {
+    const [localValue, setLocalValue] = useState(value);
+    const debouncedOnChange = useCallback(
+      debounce((newValue: number) => {
+        onChange(newValue);
+      }, 100),
+      [onChange]
+    );
+
+    useEffect(() => {
+      setLocalValue(value);
+    }, [value]);
+
+    return (
+      <div style={styles.inputContainer}>
+        <label style={styles.label}>
+          {label}: {localValue}
+        </label>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={localValue}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              setLocalValue(newValue);
+              debouncedOnChange(newValue);
+            }}
+            style={{ flex: 1 }}
+            disabled={disabled}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={styles.container}>
@@ -580,6 +678,66 @@ export default function ThreeCountdown({}: ThreeCountdownProps) {
               Stop
             </button>
           )}
+        </div>
+
+        {/* Import/Export buttons */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            marginTop: "8px",
+          }}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".json"
+            style={{ display: "none" }}
+          />
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                ...styles.button,
+                backgroundColor: "#4a5568",
+                flex: 1,
+              }}
+            >
+              Import Settings
+            </button>
+            <button
+              onClick={() => {
+                const settings: CountdownSettings = {
+                  minutes,
+                  seconds,
+                  color,
+                  textSettings,
+                };
+                const dataStr =
+                  "data:text/json;charset=utf-8," +
+                  encodeURIComponent(JSON.stringify(settings, null, 2));
+                const downloadAnchorNode = document.createElement("a");
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute(
+                  "download",
+                  "countdown_settings.json"
+                );
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+              }}
+              style={{
+                ...styles.button,
+                backgroundColor: "#4a5568",
+                flex: 1,
+              }}
+            >
+              Export Settings
+            </button>
+          </div>
         </div>
       </div>
       <div ref={containerRef} style={styles.canvas} />
