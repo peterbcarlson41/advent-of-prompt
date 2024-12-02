@@ -1,62 +1,97 @@
-# Advent of Prompt 2024
+# Day 1: 3D Countdown Timer - Advent of Prompt 2024
 
-Welcome to Advent of Prompt! This repository contains my solutions for the Advent of Prompt challenges, where we explore prompt engineering and AI interactions through daily coding exercises.
+An interactive 3D countdown timer built with Three.js and React. Features customizable 3D text that explodes into particles when the countdown reaches zero.
 
-## Structure
+![Countdown Timer Demo](demo.gif)
 
-Each day's solution is organized in its own directory:
+## Features
 
-```
-/day-01 - Three.js Countdown Timer
-/day-02 - [Coming Soon]
-...
-```
+- Real-time 3D text customization
+  - Adjustable size
+  - Controllable thickness
+  - Customizable bevel size and thickness
+  - Variable curve quality
+  - Color picker
+- Interactive countdown controls
+  - Set minutes and seconds
+  - Start/Stop functionality
+- Particle explosion effect when timer completes
+- Orbital camera controls for 3D viewing
+- Live preview of text changes
 
-## Getting Started
+## Technical Details
 
-1. Clone the repository:
+### Built With
 
-```bash
-git clone https://github.com/yourusername/advent-of-prompt.git
-```
+- Three.js for 3D rendering
+- React for UI
+- TypeScript for type safety
+- Next.js framework
 
-2. Navigate to a specific day:
+### Key Components
 
-```bash
-cd day-01
-```
+- FontLoader for 3D text rendering
+- TextGeometry for 3D text mesh creation
+- OrbitControls for camera manipulation
+- Custom particle system for explosion effects
 
-3. Install dependencies:
+## Installation
+
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-4. Run the development server:
+2. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-## Daily Projects
+3. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-### Day 1: Three.js Countdown Timer
+## Dependencies
 
-- Interactive 3D countdown timer
-- Customizable text appearance
-- Particle explosion effects
-- Built with Three.js and React
+```json
+{
+  "three": "^0.160.0",
+  "@types/three": "^0.160.0",
+  "react": "^18.2.0",
+  "next": "14.0.0",
+  "typescript": "^5.0.0"
+}
+```
 
-### Day 2-25: Coming Soon!
+## Usage
 
-Stay tuned for more daily challenges and solutions.
+1. Set your desired countdown time using the minutes and seconds inputs
+2. Customize the text appearance using the sliders:
+   - Size: Changes overall text scale
+   - Thickness: Adjusts text depth
+   - Bevel Size: Controls edge rounding
+   - Bevel Thickness: Sets depth of rounded edges
+   - Curve Quality: Adjusts text smoothness
+3. Choose a color using the color picker
+4. Click "Start Timer" to begin countdown
+5. Use orbit controls to view the 3D text from different angles
+6. Watch the particle explosion when the timer reaches zero!
 
-## Technologies Used
+## Known Issues/Limitations
 
-- React
-- Three.js
-- TypeScript
-- Next.js
-- And more to come!
+- Font must be loaded before timer can start
+- High curve quality settings may impact performance
+- Text preview updates may have slight delay on slower devices
 
-Feel free to explore, learn, and provide feedback!
+## Future Improvements
+
+- [ ] Add more particle effects options
+- [ ] Implement sound effects
+- [ ] Add preset text styles
+- [ ] Save custom settings
+- [ ] Add animation transitions between number changes
+
+## Credits
+
+- Uses the Helvetiker font for 3D text
+- Inspired by Three.js examples and documentation
