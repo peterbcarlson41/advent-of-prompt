@@ -1,7 +1,12 @@
-// app/page.js
 "use client";
 import { useState, useEffect, useRef } from "react";
 import styles from "./page.module.css";
+import dynamic from "next/dynamic";
+
+// Dynamically import the snow animation to avoid SSR issues
+const SnowAnimation = dynamic(() => import("@/components/SnowAnimation"), {
+  ssr: false,
+});
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -76,58 +81,84 @@ export default function Home() {
     }
   };
 
+  const handleClear = () => {
+    setQuery("");
+    setSuggestions([]);
+    setWeatherData(null);
+    setError(null);
+  };
+
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>Annual Snowfall Data</h1>
-
-      <div className={styles.searchContainer} ref={dropdownRef}>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter city, state, country, or zip code"
-          className={styles.input}
+      {weatherData?.snowData.totalAnnualSnowfall > 0 && (
+        <SnowAnimation
+          totalSnowfall={weatherData.snowData.totalAnnualSnowfall}
         />
+      )}
 
-        {suggestions.length > 0 && (
-          <ul className={styles.suggestions}>
-            {suggestions.map((location) => (
-              <li
-                key={`${location.latitude}-${location.longitude}`}
-                onClick={() => handleLocationSelect(location)}
-                className={styles.suggestionItem}
+      <div className={styles.content}>
+        <h1 className={styles.title}>Annual Snowfall Data</h1>
+
+        <div className={styles.searchContainer} ref={dropdownRef}>
+          <div className={styles.inputWrapper}>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Enter city, state, country, or zip code"
+              className={styles.input}
+            />
+            {query && (
+              <button
+                onClick={handleClear}
+                className={styles.clearButton}
+                aria-label="Clear search"
               >
-                {location.displayName}
-              </li>
-            ))}
-          </ul>
+                ×
+              </button>
+            )}
+          </div>
+
+          {suggestions.length > 0 && (
+            <ul className={styles.suggestions}>
+              {suggestions.map((location) => (
+                <li
+                  key={`${location.latitude}-${location.longitude}`}
+                  onClick={() => handleLocationSelect(location)}
+                  className={styles.suggestionItem}
+                >
+                  {location.displayName}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {loading && <p>Loading weather data...</p>}
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        {weatherData && (
+          <div className={styles.result}>
+            <h2>Results for {weatherData.location}</h2>
+            <p>
+              Coordinates: {weatherData.coordinates.latitude}°N,{" "}
+              {weatherData.coordinates.longitude}°W
+            </p>
+            <div className={styles.snowData}>
+              <p>
+                Total Annual Snowfall:{" "}
+                {weatherData.snowData.totalAnnualSnowfall} cm
+              </p>
+              <p>Days with Snow: {weatherData.snowData.daysWithSnow}</p>
+              <p>
+                Average Daily Snowfall:{" "}
+                {weatherData.snowData.averageDailySnowfall} cm
+              </p>
+            </div>
+          </div>
         )}
       </div>
-
-      {loading && <p>Loading weather data...</p>}
-
-      {error && <p className={styles.error}>{error}</p>}
-
-      {weatherData && (
-        <div className={styles.result}>
-          <h2>Results for {weatherData.location}</h2>
-          <p>
-            Coordinates: {weatherData.coordinates.latitude}°N,{" "}
-            {weatherData.coordinates.longitude}°W
-          </p>
-          <div className={styles.snowData}>
-            <p>
-              Total Annual Snowfall: {weatherData.snowData.totalAnnualSnowfall}{" "}
-              cm
-            </p>
-            <p>Days with Snow: {weatherData.snowData.daysWithSnow}</p>
-            <p>
-              Average Daily Snowfall:{" "}
-              {weatherData.snowData.averageDailySnowfall} cm
-            </p>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
